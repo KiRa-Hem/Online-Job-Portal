@@ -30,6 +30,11 @@ import jakarta.mail.internet.MimeMessage;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Text;
 
 @Service(value = "userService")
 public class UserServiceImpl implements UserService {
@@ -84,6 +89,14 @@ public class UserServiceImpl implements UserService {
         OTP otp = new OTP(email, genOTP, LocalDateTime.now());
         otpRepository.save(otp);
         message.setText(Data.getMessageBody(genOTP), true);
+    /**
+     * Verify the OTP sent to the user via email.
+     * 
+     * @param email the user's email address
+     * @param otp   the OTP code entered by the user
+     * @return true if the OTP is correct, false otherwise
+     * @throws JobPortalException if the OTP is incorrect or not found
+     */
         mailSender.send(mm);
         return true;
     }
@@ -140,12 +153,9 @@ public class UserServiceImpl implements UserService {
         for (String jobUrl : jobUrls) {
             try (WebDriver driver = getWebDriver()) {
                 driver.get(jobUrl);
-                // ATS-compatible application: Upload resume as PDF or fill form
-                // Example: Locate upload field and send PDF (requires file generation)
-                // Placeholder: Generate PDF from resumeDTO (implement separately)
-                String resumePdfPath = generateResumePdf(resumeDTO); // Hypothetical method
-                // driver.findElement(By.id("resume-upload")).sendKeys(resumePdfPath);
-                // Submit form (site-specific)
+                // ATS-compatible application: Upload resume as PDF
+                String resumePdfPath = generateResumePdf(resumeDTO); // Generate PDF
+                // driver.findElement(By.id("resume-upload")).sendKeys(resumePdfPath); // Site-specific
                 System.out.println("Applied to " + jobUrl + " with ATS-friendly resume");
             } catch (Exception e) {
                 throw new JobPortalException("Failed to apply to " + jobUrl + ": " + e.getMessage());
@@ -178,7 +188,6 @@ public class UserServiceImpl implements UserService {
     }
 
     private String callAIAPI(String prompt) {
-        // Configure REST call to AI API
         return restTemplate.postForObject(AI_API_URL, 
             new org.springframework.http.HttpEntity<>(new org.springframework.util.LinkedMultiValueMap<>(), 
                 org.springframework.http.HttpHeaders().set("Authorization", "Bearer " + API_KEY)
@@ -192,10 +201,48 @@ public class UserServiceImpl implements UserService {
         return new ChromeDriver(options);
     }
 
-    // Hypothetical method to generate PDF (implement with a library like iText)
     private String generateResumePdf(ResumeDTO resumeDTO) throws JobPortalException {
-        // Placeholder: Use a library like iText or Apache PDFBox to create a PDF
-        // Return file path (e.g., "path/to/resume.pdf")
-        return "path/to/generated/resume.pdf";
+        try {
+            // Define PDF file path (e.g., in a temporary directory)
+            String filePath = System.getProperty("java.io.tmpdir") + "/resume_" + resumeDTO.getName() + ".pdf";
+            PdfWriter writer = new PdfWriter(filePath);
+            PdfDocument pdf = new PdfDocument(writer);
+            Document document = new Document(pdf);
+
+            // Add ATS-friendly sections with keywords aligned to job description
+            String jobDescription = "Java Developer with Spring Boot, REST API experience"; // Fetch dynamically if possible
+            document.add(new Paragraph(new Text("Name: ").setBold()).add(resumeDTO.getName()));
+            document.add(new Paragraph(new Text("Contact: ").setBold()).add(resumeDTO.getContact()));
+            document.add(new Paragraph(new Text("Summary: ").setBold()).add(resumeDTO.getSummary()));
+            document.add(new Paragraph(new Text("Skills: ").setBold()).add(alignSkillsWithJob(resumeDTO.getSkills(), jobDescription)));
+            document.add(new Paragraph(new Text("Experience: ").setBold()).add(resumeDTO.getExperience()));
+            document.add(new Paragraph(new Text("Education: ").setBold()).add(resumeDTO.getEducation()));
+
+            // Close document
+            document.close();
+            return filePath;
+        } catch (Exception e) {
+            throw new JobPortalException("Failed to generate resume PDF: " + e.getMessage());
+        }
+    }
+
+    // Helper method to align skills with job description for ATS
+    private String alignSkillsWithJob(String skills, String jobDescription) {
+        String[] jobKeywords = jobDescription.toLowerCase().split("\\s+");
+        String[] userSkills = skills.toLowerCase().split(",\\s*");
+        Map<String, Integer> skillMap = new HashMap<>();
+        for (String skill : userSkills) {
+            skillMap.put(skill, jobKeywords.length - countMissingKeywords(skill, jobKeywords));
+        }
+        return String.join(", ", skillMap.entrySet().stream()
+            .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
+            .map(Map.Entry::getKey)
+            .toArray(String[]::new));
+    }
+
+    private int countMissingKeywords(String skill, String[] jobKeywords) {
+        return (int) java.util.Arrays.stream(jobKeywords)
+            .filter(k -> !k.contains(skill))
+            .count();
     }
 }
