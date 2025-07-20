@@ -3,6 +3,8 @@ package com.workfolio.service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -104,16 +106,32 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ResumeDTO generateResume(UserDTO userDTO) throws JobPortalException {
-        // Prepare prompt for AI (e.g., OpenAI)
-        String prompt = String.format("Generate a professional resume for %s with email %s, skills: %s, education: %s",
-                userDTO.getName(), userDTO.getEmail(), "Java, Spring Boot", "B.Tech"); // Extend with user data
+        // Enhanced prompt with ATS-friendly structure and dynamic keywords
+        String jobDescription = "Sample job: Java Developer with Spring Boot, REST API experience"; // Fetch from job URL or DB
+        String prompt = String.format(
+            "Generate a professional resume in plain text with sections: [Name], [Contact], [Summary], [Skills], [Experience], [Education]. " +
+            "Use data for %s (email: %s), skills: Java, Spring Boot, and match keywords from this job: %s. Ensure ATS compatibility with clear section headers.",
+            userDTO.getName(), userDTO.getEmail(), jobDescription);
+
         String aiResponse = callAIAPI(prompt);
 
-        // Parse AI response into ResumeDTO (simplified example)
+        // Parse AI response into ResumeDTO with structured fields
         ResumeDTO resumeDTO = new ResumeDTO();
         resumeDTO.setName(userDTO.getName());
         resumeDTO.setEmail(userDTO.getEmail());
-        resumeDTO.setContent(aiResponse); // AI-generated resume content
+        String[] sections = aiResponse.split("\\[|\\]");
+        for (int i = 0; i < sections.length - 1; i += 2) {
+            String section = sections[i + 1].trim();
+            switch (sections[i].toLowerCase()) {
+                case "name": resumeDTO.setName(section); break;
+                case "contact": resumeDTO.setContact(section); break;
+                case "summary": resumeDTO.setSummary(section); break;
+                case "skills": resumeDTO.setSkills(section); break;
+                case "experience": resumeDTO.setExperience(section); break;
+                case "education": resumeDTO.setEducation(section); break;
+            }
+        }
+        resumeDTO.setRawContent(aiResponse); // Store raw AI output for reference
         return resumeDTO;
     }
 
@@ -122,12 +140,13 @@ public class UserServiceImpl implements UserService {
         for (String jobUrl : jobUrls) {
             try (WebDriver driver = getWebDriver()) {
                 driver.get(jobUrl);
-                // Simulate form filling (e.g., name, email, resume)
-                // This is a placeholder; actual implementation depends on job site structure
-                // Example: driver.findElement(By.id("name")).sendKeys(userDTO.getName());
-                // Example: driver.findElement(By.id("resume")).sendKeys(resumeDTO.getContent());
-                // Submit application (site-specific logic)
-                System.out.println("Applied to " + jobUrl);
+                // ATS-compatible application: Upload resume as PDF or fill form
+                // Example: Locate upload field and send PDF (requires file generation)
+                // Placeholder: Generate PDF from resumeDTO (implement separately)
+                String resumePdfPath = generateResumePdf(resumeDTO); // Hypothetical method
+                // driver.findElement(By.id("resume-upload")).sendKeys(resumePdfPath);
+                // Submit form (site-specific)
+                System.out.println("Applied to " + jobUrl + " with ATS-friendly resume");
             } catch (Exception e) {
                 throw new JobPortalException("Failed to apply to " + jobUrl + ": " + e.getMessage());
             }
@@ -137,8 +156,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ResponseDTO scheduleJobApplications(UserDTO userDTO, List<String> jobUrls) throws JobPortalException {
-        // Store job URLs for scheduled execution (e.g., in a database or queue)
-        // Here, we simulate scheduling by triggering autoApplyJobs after a delay
         new Thread(() -> {
             try {
                 Thread.sleep(5000); // 5-second delay as an example
@@ -160,10 +177,8 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    // Helper method to call AI API
     private String callAIAPI(String prompt) {
-        // Configure REST call to AI API (e.g., OpenAI)
-        // This is a simplified example; use a proper SDK or secure key management
+        // Configure REST call to AI API
         return restTemplate.postForObject(AI_API_URL, 
             new org.springframework.http.HttpEntity<>(new org.springframework.util.LinkedMultiValueMap<>(), 
                 org.springframework.http.HttpHeaders().set("Authorization", "Bearer " + API_KEY)
@@ -171,10 +186,16 @@ public class UserServiceImpl implements UserService {
             String.class, prompt);
     }
 
-    // Helper method to get WebDriver instance
     private WebDriver getWebDriver() {
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless"); // Run in headless mode
+        options.addArguments("--headless");
         return new ChromeDriver(options);
+    }
+
+    // Hypothetical method to generate PDF (implement with a library like iText)
+    private String generateResumePdf(ResumeDTO resumeDTO) throws JobPortalException {
+        // Placeholder: Use a library like iText or Apache PDFBox to create a PDF
+        // Return file path (e.g., "path/to/resume.pdf")
+        return "path/to/generated/resume.pdf";
     }
 }
