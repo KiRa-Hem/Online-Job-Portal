@@ -1,7 +1,7 @@
 # Online Job Portal
 
 ## Overview
-The Online Job Portal is a full-stack web application designed to connect job seekers with employers. The backend, built with Spring Boot and MongoDB, manages user authentication, job applications, and OTP-based security. The frontend, developed with React and TypeScript using Mantine UI and Tailwind CSS, offers a responsive, dark-themed interface with various pages for job browsing and application.
+The Online Job Portal is a full-stack web application designed to connect job seekers with employers. The backend, built with Spring Boot and MongoDB, manages user authentication, job applications, and OTP-based security. The frontend, developed with React and TypeScript using Mantine UI and Tailwind CSS, provides a responsive, dark-themed interface with various pages for job browsing and application submission.
 
 ## Features
 - **User Authentication**: Register, login, reset passwords, and OTP verification via email.
@@ -184,4 +184,6 @@ D:\Projects\projectinfo-main\
 [MIT License](LICENSE)
 
 ## Contact
-For questions, contact [Your Name] at [your email or GitHub profile link].
+For questions, 
+Contact Vasa Hemesh 
+at hemeshvasa@gmail.com.
